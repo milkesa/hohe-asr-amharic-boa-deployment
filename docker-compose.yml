@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  hohe-asr-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hohe-asr-amharic
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_HOME=/models
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount local models directory (optional for faster startup)
+      - ./models:/models
+      # For production, use named volume:
+      # - asr_models:/models
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 8G
+        reservations:
+          cpus: '1'
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - asr-network
+
+# Optional: Add reverse proxy (nginx) for production
+  nginx:
+    image: nginx:alpine
+    container_name: asr-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - hohe-asr-api
+    networks:
+      - asr-network
+    restart: unless-stopped
+
+networks:
+  asr-network:
+    driver: bridge
+
+volumes:
+  asr_models:
+    driver: local
